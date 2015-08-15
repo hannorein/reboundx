@@ -18,12 +18,14 @@ class rebxf_params(Structure):
                         ("e_damping_p", c_double)]                     
 
 def modify_elements():
-    func_address = cast(clibreboundxf.rebxf_modify_elements, c_void_p).value
-    return func_address
+    #func_address = cast(clibreboundxf.rebxf_modify_elements, c_void_p).value
+    #return func_address
+    return clibreboundxf.rebxf_modify_elements
 
 def forces():
-    func_address = cast(clibreboundxf.rebxf_forces, c_void_p).value
-    return func_address
+    #func_address = cast(clibreboundxf.rebxf_forces, c_void_p).value
+    #return func_address
+    return clibreboundxf.rebxf_forces
 
 def addxf(sim):
     clibreboundxf.rebxf_addxf(sim.simulation)
