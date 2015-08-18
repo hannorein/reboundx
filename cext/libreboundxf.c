@@ -163,44 +163,8 @@ void rebxf_forces(struct reb_simulation* const sim){
 	xftools_move_to_com(sim->particles, sim->N);
 }
 
-void rebxf_modify_elements2(struct reb_simulation* const sim){
-	rebxf_check_N(sim);
-	struct rebxf_params* xf = (struct rebxf_params*)sim->xf_params;
-	struct reb_particle com = sim->particles[0];//xftools_get_com(sim);
-	for(int i=1;i<sim->N;i++){
-		struct reb_particle *p = &(sim->particles[i]);
-		struct reb_orbit o = xftools_p2orbit(sim->G, sim->particles[i], com);
-	    double da = 0.;
-		double de = 0.;
-		double dpo = 0.;	
-		if (xf->tau_a[i] != 0.){
-			da += -o.a*sim->dt/xf->tau_a[i]; 
-		}
-		
-		if (xf->tau_e[i] != 0.){
-			de += -o.e*sim->dt/xf->tau_e[i];
-			//da += -2.*o.a*o.e*o.e*xf->e_damping_p*sim->dt/xf->tau_e[i];
-			double daa = -2.*o.a*o.e*o.e*sim->dt/xf->tau_e[i];
-			da += daa;
-			//printf("%.16f\t%f\t%f\t%f\n", daa, o.a, o.e, xf->tau_e[i]);
-
-		}
-
-		if (xf->tau_pomega[i] != 0.){
-			dpo += 2*M_PI*sim->dt/xf->tau_pomega[i];
-		}
-
-		o.a += da;
-		o.e += de;
-		o.omega += dpo;
-
-		xftools_orbit2p(&sim->particles[i], sim->G, &com, o); 
-		com = xftools_get_com_of_pair(com, sim->particles[i]);
-	}
-	xftools_move_to_com(sim->particles, sim->N);
-}
-
 void rebxf_modify_elements(struct reb_simulation* const sim){
+	rebxf_check_N(sim);
 	struct rebxf_params* xf = (struct rebxf_params*)sim->xf_params;
 	struct reb_particle com = sim->particles[0];
 	for(int i=1;i<sim->N;i++){
@@ -212,10 +176,16 @@ void rebxf_modify_elements(struct reb_simulation* const sim){
 		if (xf->tau_a[i] != 0.){
 			da += -o.a*sim->dt/xf->tau_a[i]; 
 		}
-		
+	
 		if (xf->tau_e[i] != 0.){
 			de += -o.e*sim->dt/xf->tau_e[i];
-			da += -2.*o.a*o.e*o.e*xf->e_damping_p*sim->dt/xf->tau_e[i];
+			//da += -2.*o.a*o.e*o.e*xf->e_damping_p*sim->dt/xf->tau_e[i];
+			double daa = -2.*o.a*o.e*o.e*sim->dt/xf->tau_e[i];
+			//if(-2.*o.a*o.e*o.e*sim->dt/xf->tau_e[i] == -2.*o.a*o.e*o.e*xf->e_damping_p*sim->dt/xf->tau_e[i]){ exit(1); }
+			daa *= xf->e_damping_p;
+			da += daa;
+			//printf("%f\t%.18e\t%.18e\t%.16f\n", sim->t, da-2.*o.a*o.e*o.e*xf->e_damping_p*sim->dt/xf->tau_e[i] , da-2.*o.a*o.e*o.e*sim->dt/xf->tau_e[i], xf->e_damping_p);
+
 		}
 
 		if (xf->tau_pomega[i] != 0.){
@@ -227,44 +197,9 @@ void rebxf_modify_elements(struct reb_simulation* const sim){
 		o.omega += dpo;
 
 		xftools_orbit2p(&sim->particles[i], sim->G, &com, o); 
-
-		com = xftools_get_com_of_pair(com, sim->particles[i]);
-	}
-	//xftools_move_to_com(sim->particles, sim->N);
-}
-
-void rebxf_modify_elements_test(struct reb_simulation* const sim){
-	struct rebxf_params* xf = (struct rebxf_params*)sim->xf_params;
-	struct reb_particle com = xftools_get_com(sim);//sim->particles[0];
-	for(int i=1;i<sim->N;i++){
-		struct reb_particle *p = &(sim->particles[i]);
-		struct reb_orbit o = xftools_p2orbit(sim->G, sim->particles[i], com);
-	    double da = 0.;
-		double de = 0.;
-		double dpo = 0.;	
-		if (xf->tau_a[i] != 0.){
-			da += -o.a*sim->dt/xf->tau_a[i]; 
-		}
-		
-		if (xf->tau_e[i] != 0.){
-			de += -o.e*sim->dt/xf->tau_e[i];
-			da += -2.*o.a*o.e*o.e*xf->e_damping_p*sim->dt/xf->tau_e[i];
-		}
-
-		if (xf->tau_pomega[i] != 0.){
-			dpo += 2*M_PI*sim->dt/xf->tau_pomega[i];
-		}
-
-		o.a += da;
-		o.e += de;
-		o.omega += dpo;
-
-		xftools_orbit2p(&sim->particles[i], sim->G, &com, o); 
-
+		//printf("%f\t%.16f\n", sim->t, o.a);
 		//com = xftools_get_com_of_pair(com, sim->particles[i]);
 	}
 	xftools_move_to_com(sim->particles, sim->N);
 }
-
-
 
