@@ -83,6 +83,13 @@ class Params(object):
         arr = (c_double * len(tau_pomega))(*tau_pomega)
         clibreboundxf.rebxf_set_tau_pomega(self.simulation, byref(arr))
 
+    @property
+    def e_damping_p(self):
+        return self.params.contents.e_damping_p
+    @e_damping_p.setter
+    def e_damping_p(self, p):
+        self.params.contents.e_damping_p = p
+
 '''def set_e_damping_p(value):
     clibreboundxf.rebxf_set_e_damping_p(c_double(value))
 
