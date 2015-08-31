@@ -112,7 +112,6 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	struct reb_vec3d* restrict a_new = rebxparams->a_new;
 	struct reb_vec3d* restrict a_old = rebxparams->a_old;
 
-
 	for (int i=0; i<_N_real; i++){
 		a_newton[i].x = particles[i].ax;
 		a_newton[i].y = particles[i].ay;
@@ -171,6 +170,9 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double rij = sqrt(r2ij);
 				const double rij3i = 1./(r2ij*rij);
 				
+				const double dvxij = particles[i].vx - particles[j].vx;
+				const double dvyij = particles[i].vy - particles[j].vy;
+				const double dvzij = particles[i].vz - particles[j].vz;
 
 				double vi2 = particles[i].vx*particles[i].vx + particles[i].vy*particles[i].vy + particles[i].vz*particles[i].vz;
 				double a3 = -vi2*C2i;
@@ -180,25 +182,18 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 
 				double a5 = (4.*C2i) * (particles[i].vx*particles[j].vx + particles[i].vy*particles[j].vy + particles[i].vz*particles[j].vz); 
 				
-				double a6_0 = dxij*particles[j].vx + dyij*particles[j].vy + dzij*particles[j].vz;
-				double a6 = (3./(2.*C*C)) * a6_0*a6_0/r2ij;
+				double dxijvj = dxij*particles[j].vx + dyij*particles[j].vy + dzij*particles[j].vz;
+				double a6 = (3./2.*C2i) * dxijvj*dxijvj/r2ij;
 				
 				double factor1 = a1 + a2 + a3 + a4 + a5 + a6;
-				 
-				a_const[i].x += G*particles[j].m*dxij*factor1*rij3i;
-				a_const[i].y += G*particles[j].m*dyij*factor1*rij3i;
-				a_const[i].z += G*particles[j].m*dzij*factor1*rij3i;
-				
-				
-				const double dvxij = particles[i].vx - particles[j].vx;
-				const double dvyij = particles[i].vy - particles[j].vy;
-				const double dvzij = particles[i].vz - particles[j].vz;
 					
 				double factor2 = dxij*(4.*particles[i].vx-3.*particles[j].vx)+dyij*(4.*particles[i].vy-3.*particles[j].vy)+dzij*(4.*particles[i].vz-3.*particles[j].vz);
 
-				a_const[i].x += G*particles[j].m*factor2*dvxij*rij3i*C2i;
-				a_const[i].y += G*particles[j].m*factor2*dvyij*rij3i*C2i;
-				a_const[i].z += G*particles[j].m*factor2*dvzij*rij3i*C2i;
+				const double prefac1 = G*particles[j].m*factor1*rij3i;
+				const double prefac2 = G*particles[j].m*factor2*rij3i*C2i;
+				a_const[i].x += prefac1*dxij + prefac2*dvxij;
+				a_const[i].y += prefac1*dyij + prefac2*dvyij;
+				a_const[i].z += prefac1*dzij + prefac2*dvzij;
 			}
 		}
 	}
@@ -233,7 +228,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double daj = dxij*a_oldjx+dyij*a_oldjy+dzij*a_oldjz;
 				const double dai = dxij*a_oldix+dyij*a_oldiy+dzij*a_oldiz;
 				const double prefac1 = G/(r2ij*rij*2.*C*C);
-				const double prefac2 = (7./(2.*C*C))*G/rij;
+				const double prefac2 = (7./2.*C2i)*G/rij;
 				a_new[i].x += particles[j].m * (prefac1*daj*dxij + prefac2*a_oldjx);
 				a_new[i].y += particles[j].m * (prefac1*daj*dyij + prefac2*a_oldjy);
 				a_new[i].z += particles[j].m * (prefac1*daj*dzij + prefac2*a_oldjz);
