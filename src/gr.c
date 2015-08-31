@@ -133,7 +133,6 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		a_newton[1].x = prefact0*dx;
 		a_newton[1].y = prefact0*dy;
 		a_newton[1].z = prefact0*dz;
-
 	}
 
 	// then compute the constant terms:
@@ -210,9 +209,9 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	}
 
 
-	memset(a_new,0,sizeof(struct reb_vec3d)*_N_real);
+	memset(a_new,0,sizeof(struct reb_vec3d)*_N_real); // initial guess = newton + const
 
-	// Now running the iteration 
+	// Now running the iteration, max number of iterations: 10 
 	for (int k=0; k<10; k++){ 
 		{ // Swap
 			struct reb_vec3d* restrict a_tmp = a_old;
