@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "rebound.h"
 #include "reboundx.h"
 #include "gr.h"
@@ -105,10 +106,10 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		rebxparams->a_old = realloc(rebxparams->a_old, sizeof(struct reb_vec3d)*_N_real);
 		rebxparams->allocatedN = _N_real;
 	}
-	struct reb_vec3d* const a_const = rebxparams->a_const;
-	struct reb_vec3d* const a_newton = rebxparams->a_newton;
-	struct reb_vec3d* a_new = rebxparams->a_new;
-	struct reb_vec3d* a_old = rebxparams->a_old;
+	struct reb_vec3d* restrict const a_const = rebxparams->a_const;
+	struct reb_vec3d* restrict const a_newton = rebxparams->a_newton;
+	struct reb_vec3d* restrict a_new = rebxparams->a_new;
+	struct reb_vec3d* restrict a_old = rebxparams->a_old;
 
 
 	for (int i=0; i<_N_real; i++){
@@ -136,11 +137,9 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 
 	}
 
+	// then compute the constant terms:
+	memset(a_const,0,sizeof(struct reb_vec3d)*_N_real);
 	for (int i=0; i<_N_real; i++){
-		// then compute the constant terms:
-		double a_constx = 0.;
-		double a_consty = 0.;
-		double a_constz = 0.;
 		// 1st constant part
 		for (int j=0; j<_N_real; j++){
 			if (j != i){
@@ -184,9 +183,9 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				
 				double factor1 = -1. + a1 + a2 + a3 + a4 + a5 + a6;
 				 
-				a_constx += G*particles[j].m*dxij*factor1/(r2ij*rij);
-				a_consty += G*particles[j].m*dyij*factor1/(r2ij*rij);
-				a_constz += G*particles[j].m*dzij*factor1/(r2ij*rij);
+				a_const[i].x += G*particles[j].m*dxij*factor1/(r2ij*rij);
+				a_const[i].y += G*particles[j].m*dyij*factor1/(r2ij*rij);
+				a_const[i].z += G*particles[j].m*dzij*factor1/(r2ij*rij);
 				
 				
 				const double dvxij = particles[i].vx - particles[j].vx;
@@ -195,48 +194,42 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 					
 				double factor2 = dxij*(4.*particles[i].vx-3.*particles[j].vx)+dyij*(4.*particles[i].vy-3.*particles[j].vy)+dzij*(4.*particles[i].vz-3.*particles[j].vz);
 
-				a_constx += G*particles[j].m*factor2*dvxij/(r2ij*rij)/(C*C);
-				a_consty += G*particles[j].m*factor2*dvyij/(r2ij*rij)/(C*C);
-				a_constz += G*particles[j].m*factor2*dvzij/(r2ij*rij)/(C*C);
+				a_const[i].x += G*particles[j].m*factor2*dvxij/(r2ij*rij)/(C*C);
+				a_const[i].y += G*particles[j].m*factor2*dvyij/(r2ij*rij)/(C*C);
+				a_const[i].z += G*particles[j].m*factor2*dvzij/(r2ij*rij)/(C*C);
 			}
 		}
-		a_const[i].x = a_constx;
-		a_const[i].y = a_consty;
-		a_const[i].z = a_constz;
 	}
-	//fprintf(stderr,"%.16e\t%.16e\n",particles[1].ax, a_newton[1][0]);
 
 
 	// Now running the substitution again and again through the loop below
 	for (int k=0; k<10; k++){ // you can set k as how many substitution you want to make
 		{ // Swap
-			struct reb_vec3d* a_tmp = a_old;
+			struct reb_vec3d* restrict a_tmp = a_old;
 			a_old = a_new;
 			a_new = a_tmp;
+			memcpy(a_new,a_const,sizeof(struct reb_vec3d)*_N_real);
 		}
 		// now add on the non-constant term
 		for (int i=0; i<_N_real; i++){ // a_j is used to update a_i and vice versa
-			double non_constx = 0.;
-			double non_consty = 0.;
-			double non_constz = 0.;
-			for (int j=0; j<_N_real; j++){
-				if (j != i){
-					const double dxij = particles[i].x - particles[j].x;
-					const double dyij = particles[i].y - particles[j].y;
-					const double dzij = particles[i].z - particles[j].z;
-					const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
-					const double rij = sqrt(r2ij);
-					non_constx += (G*particles[j].m*dxij/(r2ij*rij))*(dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z)/(2.*C*C)+\
-										(7./(2.*C*C))*G*particles[j].m*a_old[j].x/rij;
-					non_consty += (G*particles[j].m*dyij/(r2ij*rij))*(dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z)/(2.*C*C)+\
-										(7./(2.*C*C))*G*particles[j].m*a_old[j].y/rij;
-					non_constz += (G*particles[j].m*dzij/(r2ij*rij))*(dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z)/(2.*C*C)+\
-										(7./(2.*C*C))*G*particles[j].m*a_old[j].z/rij;
-				}
+			for (int j=i+1; j<_N_real; j++){
+				const double dxij = particles[i].x - particles[j].x;
+				const double dyij = particles[i].y - particles[j].y;
+				const double dzij = particles[i].z - particles[j].z;
+				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
+				const double rij = sqrt(r2ij);
+				const double daj = dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z;
+				const double dai = dxij*a_old[i].x+dyij*a_old[i].y+dzij*a_old[i].z;
+				const double prefac1 = G/(r2ij*rij*2.*C*C);
+				const double prefac2 = (7./(2.*C*C))*G/rij;
+				a_new[i].x += particles[j].m * (prefac1*daj*dxij + prefac2*a_old[j].x);
+				a_new[i].y += particles[j].m * (prefac1*daj*dyij + prefac2*a_old[j].y);
+				a_new[i].z += particles[j].m * (prefac1*daj*dzij + prefac2*a_old[j].z);
+				                                       
+				a_new[j].x -= particles[i].m * (prefac1*dai*dxij + prefac2*a_old[i].x);
+				a_new[j].y -= particles[i].m * (prefac1*dai*dyij + prefac2*a_old[i].y);
+				a_new[j].z -= particles[i].m * (prefac1*dai*dzij + prefac2*a_old[i].z);
 			}
-			a_new[i].x = (a_const[i].x + non_constx);
-			a_new[i].y = (a_const[i].y + non_consty);
-			a_new[i].z = (a_const[i].z + non_constz);
 		}
 
 		// break out loop if a_new is converging
