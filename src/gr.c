@@ -94,6 +94,7 @@ void rebx_gr_potential(struct reb_simulation* const sim){
 void rebx_gr_implicit(struct reb_simulation* const sim){
 	struct rebx_params_gr* rebxparams = &((struct rebx_extras*)(sim->extras))->gr;
 	const double C = rebxparams->c;
+	const double C2i = 1./(C*C);
 	const int _N_real = sim->N - sim->N_var;
 	const double G = sim->G;
 	struct reb_particle* const particles = sim->particles;
@@ -117,7 +118,6 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		a_newton[i].x = particles[i].ax;
 		a_newton[i].y = particles[i].ay;
 		a_newton[i].z = particles[i].az;
-		a_new[i] = a_newton[i]; // we want to use Newtonian term as our first substitution, hence the assignment here
 	}
 	if (_gravity_ignore_10){
 		const double dx = particles[0].x - particles[1].x;
@@ -143,12 +143,6 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		// 1st constant part
 		for (int j=0; j<_N_real; j++){
 			if (j != i){
-				const double dxij = particles[i].x - particles[j].x;
-				const double dyij = particles[i].y - particles[j].y;
-				const double dzij = particles[i].z - particles[j].z;
-				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
-				const double rij = sqrt(r2ij);
-				
 				double a1 = 0.;
 				double a2 = 0.;
 				for (int k=0; k<_N_real; k++){
@@ -158,7 +152,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 						const double dzik = particles[i].z - particles[k].z;
 						const double r2ik = dxik*dxik + dyik*dyik + dzik*dzik;
 						const double rik = sqrt(r2ik);
-						a1 += (4./(C*C)) * G*particles[k].m/rik;
+						a1 += (4.*C2i) * G*particles[k].m/rik;
 					}
 					if (k != j){
 						const double dxlj = particles[k].x - particles[j].x;
@@ -166,26 +160,34 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 						const double dzlj = particles[k].z - particles[j].z;
 						const double r2lj = dxlj*dxlj + dylj*dylj + dzlj*dzlj;
 						const double rlj = sqrt(r2lj);
-						a2 += (1./(C*C)) * G*particles[k].m/rlj;
+						a2 += (1.*C2i) * G*particles[k].m/rlj;
 					}
 				}
+				
+				const double dxij = particles[i].x - particles[j].x;
+				const double dyij = particles[i].y - particles[j].y;
+				const double dzij = particles[i].z - particles[j].z;
+				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
+				const double rij = sqrt(r2ij);
+				const double rij3i = 1./(r2ij*rij);
+				
 
 				double vi2 = particles[i].vx*particles[i].vx + particles[i].vy*particles[i].vy + particles[i].vz*particles[i].vz;
-				double a3 = -vi2/(C*C);
+				double a3 = -vi2*C2i;
 
 				double vj2 = particles[j].vx*particles[j].vx + particles[j].vy*particles[j].vy + particles[j].vz*particles[j].vz;
-				double a4 = -2.*vj2/(C*C);
+				double a4 = -2.*vj2*C2i;
 
-				double a5 = (4./(C*C)) * (particles[i].vx*particles[j].vx + particles[i].vy*particles[j].vy + particles[i].vz*particles[j].vz); 
+				double a5 = (4.*C2i) * (particles[i].vx*particles[j].vx + particles[i].vy*particles[j].vy + particles[i].vz*particles[j].vz); 
 				
 				double a6_0 = dxij*particles[j].vx + dyij*particles[j].vy + dzij*particles[j].vz;
 				double a6 = (3./(2.*C*C)) * a6_0*a6_0/r2ij;
 				
 				double factor1 = -1. + a1 + a2 + a3 + a4 + a5 + a6;
 				 
-				a_const[i].x += G*particles[j].m*dxij*factor1/(r2ij*rij);
-				a_const[i].y += G*particles[j].m*dyij*factor1/(r2ij*rij);
-				a_const[i].z += G*particles[j].m*dzij*factor1/(r2ij*rij);
+				a_const[i].x += G*particles[j].m*dxij*factor1*rij3i;
+				a_const[i].y += G*particles[j].m*dyij*factor1*rij3i;
+				a_const[i].z += G*particles[j].m*dzij*factor1*rij3i;
 				
 				
 				const double dvxij = particles[i].vx - particles[j].vx;
@@ -194,14 +196,15 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 					
 				double factor2 = dxij*(4.*particles[i].vx-3.*particles[j].vx)+dyij*(4.*particles[i].vy-3.*particles[j].vy)+dzij*(4.*particles[i].vz-3.*particles[j].vz);
 
-				a_const[i].x += G*particles[j].m*factor2*dvxij/(r2ij*rij)/(C*C);
-				a_const[i].y += G*particles[j].m*factor2*dvyij/(r2ij*rij)/(C*C);
-				a_const[i].z += G*particles[j].m*factor2*dvzij/(r2ij*rij)/(C*C);
+				a_const[i].x += G*particles[j].m*factor2*dvxij*rij3i*C2i;
+				a_const[i].y += G*particles[j].m*factor2*dvyij*rij3i*C2i;
+				a_const[i].z += G*particles[j].m*factor2*dvzij*rij3i*C2i;
 			}
 		}
 	}
 
 
+	memcpy(a_new,a_newton,sizeof(struct reb_vec3d)*_N_real); // we want to use Newtonian term as our first substitution, hence the assignment here
 	// Now running the substitution again and again through the loop below
 	for (int k=0; k<10; k++){ // you can set k as how many substitution you want to make
 		{ // Swap
