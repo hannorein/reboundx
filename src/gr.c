@@ -97,7 +97,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	const double C2i = 1./(C*C);
 	const int _N_real = sim->N - sim->N_var;
 	const double G = sim->G;
-	struct reb_particle* const particles = sim->particles;
+	struct reb_particle* const restrict particles = sim->particles;
 	const unsigned int _gravity_ignore_10 = sim->gravity_ignore_10;
 
 	if (rebxparams->allocatedN<_N_real){
@@ -114,12 +114,12 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 
 
 	for (int i=0; i<_N_real; i++){
-		// compute the Newtonian term 
 		a_newton[i].x = particles[i].ax;
 		a_newton[i].y = particles[i].ay;
 		a_newton[i].z = particles[i].az;
 	}
-	if (_gravity_ignore_10){
+	// extra newtonian terms
+	if (_gravity_ignore_10 && _N_real>1){
 		const double dx = particles[0].x - particles[1].x;
 		const double dy = particles[0].y - particles[1].y;
 		const double dz = particles[0].z - particles[1].z;
@@ -128,12 +128,12 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		const double prefact = -G/(r2*r);
 		const double prefact0 = prefact*particles[0].m;
 		const double prefact1 = prefact*particles[1].m;
-		a_newton[0].x += prefact1*dx;
-		a_newton[0].y += prefact1*dy;
-		a_newton[0].z += prefact1*dz;
-		a_newton[1].x -= prefact0*dx;
-		a_newton[1].y -= prefact0*dy;
-		a_newton[1].z -= prefact0*dz;
+		a_newton[0].x = prefact1*dx;
+		a_newton[0].y = prefact1*dy;
+		a_newton[0].z = prefact1*dz;
+		a_newton[1].x = prefact0*dx;
+		a_newton[1].y = prefact0*dy;
+		a_newton[1].z = prefact0*dz;
 
 	}
 
@@ -183,7 +183,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				double a6_0 = dxij*particles[j].vx + dyij*particles[j].vy + dzij*particles[j].vz;
 				double a6 = (3./(2.*C*C)) * a6_0*a6_0/r2ij;
 				
-				double factor1 = -1. + a1 + a2 + a3 + a4 + a5 + a6;
+				double factor1 = a1 + a2 + a3 + a4 + a5 + a6;
 				 
 				a_const[i].x += G*particles[j].m*dxij*factor1*rij3i;
 				a_const[i].y += G*particles[j].m*dyij*factor1*rij3i;
@@ -204,57 +204,70 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	}
 
 
-	memcpy(a_new,a_newton,sizeof(struct reb_vec3d)*_N_real); // we want to use Newtonian term as our first substitution, hence the assignment here
+	memcpy(a_new,a_newton,sizeof(struct reb_vec3d)*_N_real); // we want to use Newtonian term as our first guess, hence the assignment here
+
 	// Now running the substitution again and again through the loop below
 	for (int k=0; k<10; k++){ // you can set k as how many substitution you want to make
 		{ // Swap
 			struct reb_vec3d* restrict a_tmp = a_old;
 			a_old = a_new;
 			a_new = a_tmp;
-			memcpy(a_new,a_const,sizeof(struct reb_vec3d)*_N_real);
+			memset(a_new,0,sizeof(struct reb_vec3d)*_N_real);
 		}
 		// now add on the non-constant term
 		for (int i=0; i<_N_real; i++){ // a_j is used to update a_i and vice versa
 			for (int j=i+1; j<_N_real; j++){
+				const double a_oldix = a_newton[i].x + a_const[i].x + a_old[i].x;
+				const double a_oldiy = a_newton[i].y + a_const[i].y + a_old[i].y;
+				const double a_oldiz = a_newton[i].z + a_const[i].z + a_old[i].z;
+				                                        
+				const double a_oldjx = a_newton[j].x + a_const[j].x + a_old[j].x;
+				const double a_oldjy = a_newton[j].y + a_const[j].y + a_old[j].y;
+				const double a_oldjz = a_newton[j].z + a_const[j].z + a_old[j].z;
+
 				const double dxij = particles[i].x - particles[j].x;
 				const double dyij = particles[i].y - particles[j].y;
 				const double dzij = particles[i].z - particles[j].z;
 				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
 				const double rij = sqrt(r2ij);
-				const double daj = dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z;
-				const double dai = dxij*a_old[i].x+dyij*a_old[i].y+dzij*a_old[i].z;
+				const double daj = dxij*a_oldjx+dyij*a_oldjy+dzij*a_oldjz;
+				const double dai = dxij*a_oldix+dyij*a_oldiy+dzij*a_oldiz;
 				const double prefac1 = G/(r2ij*rij*2.*C*C);
 				const double prefac2 = (7./(2.*C*C))*G/rij;
-				a_new[i].x += particles[j].m * (prefac1*daj*dxij + prefac2*a_old[j].x);
-				a_new[i].y += particles[j].m * (prefac1*daj*dyij + prefac2*a_old[j].y);
-				a_new[i].z += particles[j].m * (prefac1*daj*dzij + prefac2*a_old[j].z);
+				a_new[i].x += particles[j].m * (prefac1*daj*dxij + prefac2*a_oldjx);
+				a_new[i].y += particles[j].m * (prefac1*daj*dyij + prefac2*a_oldjy);
+				a_new[i].z += particles[j].m * (prefac1*daj*dzij + prefac2*a_oldjz);
 				                                       
-				a_new[j].x -= particles[i].m * (prefac1*dai*dxij + prefac2*a_old[i].x);
-				a_new[j].y -= particles[i].m * (prefac1*dai*dyij + prefac2*a_old[i].y);
-				a_new[j].z -= particles[i].m * (prefac1*dai*dzij + prefac2*a_old[i].z);
+				a_new[j].x -= particles[i].m * (prefac1*dai*dxij + prefac2*a_oldix);
+				a_new[j].y -= particles[i].m * (prefac1*dai*dyij + prefac2*a_oldiy);
+				a_new[j].z -= particles[i].m * (prefac1*dai*dzij + prefac2*a_oldiz);
 			}
 		}
 
 		// break out loop if a_new is converging
-		int breakout = 0;
+		double maxd = 0.;
 		for (int i=0; i< _N_real; i++){
-			double dx = fabs(a_new[i].x - a_old[i].x)/a_old[i].x;
-			double dy = fabs(a_new[i].y - a_old[i].y)/a_old[i].y;
-			double dz = fabs(a_new[i].z - a_old[i].z)/a_old[i].z;
-			if ((dx<1.e-30) && (dy<1.e-30) && (dz<1.e-30)){
-				breakout += 1;
+			const double dx = a_new[i].x - a_old[i].x;
+			const double dy = a_new[i].y - a_old[i].y;
+			const double dz = a_new[i].z - a_old[i].z;
+			const double x = a_new[i].x;
+			const double y = a_new[i].y;
+			const double z = a_new[i].z;
+			const double d = (dx*dx + dy*dy + dz*dz) / (x*x + y*y + z*z);
+			if (isnormal(d)  && d>maxd){
+				maxd = d;
 			}
 		}
-		if (breakout == 2){
-			//printf(">>>>Precision reached in round %d<<<< \n", k);
+		if (maxd<1e-15){
+			printf(">>>>Precision reached in round %d<<<< \n", k);
 			break;
 		}
 	}
 	// update acceleration in particles
 	for (int i=0; i<_N_real;i++){
-		particles[i].ax += a_new[i].x - a_newton[i].x; // substract newtonian term off since WHFAST would add it on later
-		particles[i].ay += a_new[i].y - a_newton[i].y;
-		particles[i].az += a_new[i].z - a_newton[i].z;
+		particles[i].ax += a_new[i].x + a_const[i].x; // substract newtonian term off since WHFAST would add it on later
+		particles[i].ay += a_new[i].y + a_const[i].y;
+		particles[i].az += a_new[i].z + a_const[i].z;
 	}
 					
 }
