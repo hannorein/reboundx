@@ -134,7 +134,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		double a_consty = 0.;
 		double a_constz = 0.;
 		// 1st constant part
-		for (int j = 0; j< _N_real; j++){
+		for (int j=0; j<_N_real; j++){
 			if (j != i){
 				const double dxij = particles[i].x - particles[j].x;
 				const double dyij = particles[i].y - particles[j].y;
@@ -143,7 +143,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double rij = sqrt(r2ij);
 				
 				double a1 = 0.;
-				for (int k = 0; k< _N_real; k++){
+				for (int k=0; k<_N_real; k++){
 					if (k != i){
 						const double dxik = particles[i].x - particles[k].x;
 						const double dyik = particles[i].y - particles[k].y;
@@ -155,7 +155,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				}
 
 				double a2 = 0.;
-				for (int l = 0; l< _N_real; l++){
+				for (int l=0; l<_N_real; l++){
 					if (l != j){
 						const double dxlj = particles[l].x - particles[j].x;
 						const double dylj = particles[l].y - particles[j].y;
@@ -189,7 +189,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 			}
 		}	
 		// 2nd consant part
-		for (int j = 0; j< _N_real; j++){
+		for (int j=0; j<_N_real; j++){
 			if (j != i){
 				const double dxij = particles[i].x - particles[j].x;
 				const double dyij = particles[i].y - particles[j].y;
@@ -217,17 +217,17 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	// Now running the substitution again and again through the loop below
 	for (int k=0; k<10; k++){ // you can set k as how many substitution you want to make
 		double a_old[_N_real][3]; // initialize an arry that stores the information of previousu calculated accleration
-		for (int i =0; i <_N_real; i++){
+		for (int i=0; i<_N_real; i++){
 			a_old[i][0] = a_new[i][0]; // when k = 0, a_new is the Newtownian term which calculated before
 			a_old[i][1] = a_new[i][1];
 			a_old[i][2] = a_new[i][2];
 		}
 		// now add on the non-constant term
-		for (int i = 0; i < _N_real; i++){ // a_j is used to update a_i and vice versa
+		for (int i=0; i<_N_real; i++){ // a_j is used to update a_i and vice versa
 			double non_constx = 0.;
 			double non_consty = 0.;
 			double non_constz = 0.;
-			for (int j = 0; j < _N_real; j++){
+			for (int j=0; j<_N_real; j++){
 				if (j != i){
 					const double dxij = particles[i].x - particles[j].x;
 					const double dyij = particles[i].y - particles[j].y;
@@ -249,7 +249,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 
 		// break out loop if a_new is converging
 		int breakout = 0;
-		for (int i = 0; i < _N_real; i++){
+		for (int i=0; i< _N_real; i++){
 			double dx = fabs(a_new[i][0] - a_old[i][0])/a_old[i][0];
 			double dy = fabs(a_new[i][1] - a_old[i][1])/a_old[i][1];
 			double dz = fabs(a_new[i][2] - a_old[i][2])/a_old[i][2];
@@ -257,7 +257,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 			fprintf(d, "number %d: %d: %.30e \n", k, i, dx);
 			fclose(d);
 			}*/
-			if ((dx<1.e-30) && (dy <1.e-30) && (dz<1.e-30)){
+			if ((dx<1.e-30) && (dy<1.e-30) && (dz<1.e-30)){
 				breakout += 1;
 			}
 		}
@@ -267,7 +267,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		}
 	}
 	// update acceleration in particles
-	for (int i = 0; i <_N_real;i++){
+	for (int i=0; i<_N_real;i++){
 		particles[i].ax += a_new[i][0] - a_newton[i][0]; // substract newtonian term off since WHFAST would add it on later
 		particles[i].ay += a_new[i][1] - a_newton[i][1];
 		particles[i].az += a_new[i][2] - a_newton[i][2];
