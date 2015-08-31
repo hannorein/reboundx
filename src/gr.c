@@ -204,10 +204,10 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	}
 
 
-	memcpy(a_new,a_newton,sizeof(struct reb_vec3d)*_N_real); // we want to use Newtonian term as our first guess, hence the assignment here
+	memset(a_new,0,sizeof(struct reb_vec3d)*_N_real);
 
-	// Now running the substitution again and again through the loop below
-	for (int k=0; k<10; k++){ // you can set k as how many substitution you want to make
+	// Now running the iteration 
+	for (int k=0; k<10; k++){ 
 		{ // Swap
 			struct reb_vec3d* restrict a_tmp = a_old;
 			a_old = a_new;
@@ -258,14 +258,13 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				maxd = d;
 			}
 		}
-		if (maxd<1e-15){
-			printf(">>>>Precision reached in round %d<<<< \n", k);
+		if (maxd<1e-30){
 			break;
 		}
 	}
 	// update acceleration in particles
 	for (int i=0; i<_N_real;i++){
-		particles[i].ax += a_new[i].x + a_const[i].x; // substract newtonian term off since WHFAST would add it on later
+		particles[i].ax += a_new[i].x + a_const[i].x; 
 		particles[i].ay += a_new[i].y + a_const[i].y;
 		particles[i].az += a_new[i].z + a_const[i].z;
 	}
