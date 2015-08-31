@@ -24,6 +24,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "rebound.h"
 #include "reboundx.h"
@@ -97,18 +98,25 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	struct reb_particle* const particles = sim->particles;
 	const unsigned int _gravity_ignore_10 = sim->gravity_ignore_10;
 
-	double a_const[_N_real][3]; // array that stores the value of the constant term
-	double a_newton[_N_real][3]; // stores the Newtonian term
-	double a_new[_N_real][3]; // stores the newly calculated term
+	if (rebxparams->allocatedN<_N_real){
+		rebxparams->a_const = realloc(rebxparams->a_const, sizeof(struct reb_vec3d)*_N_real);
+		rebxparams->a_newton = realloc(rebxparams->a_newton, sizeof(struct reb_vec3d)*_N_real);
+		rebxparams->a_new = realloc(rebxparams->a_new, sizeof(struct reb_vec3d)*_N_real);
+		rebxparams->a_old = realloc(rebxparams->a_old, sizeof(struct reb_vec3d)*_N_real);
+		rebxparams->allocatedN = _N_real;
+	}
+	struct reb_vec3d* const a_const = rebxparams->a_const;
+	struct reb_vec3d* const a_newton = rebxparams->a_newton;
+	struct reb_vec3d* a_new = rebxparams->a_new;
+	struct reb_vec3d* a_old = rebxparams->a_old;
+
 
 	for (int i=0; i<_N_real; i++){
 		// compute the Newtonian term 
-		a_newton[i][0] = particles[i].ax;
-		a_newton[i][1] = particles[i].ay;
-		a_newton[i][2] = particles[i].az;
-		a_new[i][0] = a_newton[i][0]; // we want to use Newtonian term as our first substitution, hence the assignment here
-		a_new[i][1] = a_newton[i][1];
-		a_new[i][2] = a_newton[i][1];
+		a_newton[i].x = particles[i].ax;
+		a_newton[i].y = particles[i].ay;
+		a_newton[i].z = particles[i].az;
+		a_new[i] = a_newton[i]; // we want to use Newtonian term as our first substitution, hence the assignment here
 	}
 	if (_gravity_ignore_10){
 		const double dx = particles[0].x - particles[1].x;
@@ -119,12 +127,12 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		const double prefact = -G/(r2*r);
 		const double prefact0 = prefact*particles[0].m;
 		const double prefact1 = prefact*particles[1].m;
-		a_newton[0][0] += prefact1*dx;
-		a_newton[0][1] += prefact1*dy;
-		a_newton[0][2] += prefact1*dz;
-		a_newton[1][0] -= prefact0*dx;
-		a_newton[1][1] -= prefact0*dy;
-		a_newton[1][2] -= prefact0*dz;
+		a_newton[0].x += prefact1*dx;
+		a_newton[0].y += prefact1*dy;
+		a_newton[0].z += prefact1*dz;
+		a_newton[1].x -= prefact0*dx;
+		a_newton[1].y -= prefact0*dy;
+		a_newton[1].z -= prefact0*dz;
 
 	}
 
@@ -143,6 +151,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double rij = sqrt(r2ij);
 				
 				double a1 = 0.;
+				double a2 = 0.;
 				for (int k=0; k<_N_real; k++){
 					if (k != i){
 						const double dxik = particles[i].x - particles[k].x;
@@ -152,50 +161,34 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 						const double rik = sqrt(r2ik);
 						a1 += (4./(C*C)) * G*particles[k].m/rik;
 					}
-				}
-
-				double a2 = 0.;
-				for (int l=0; l<_N_real; l++){
-					if (l != j){
-						const double dxlj = particles[l].x - particles[j].x;
-						const double dylj = particles[l].y - particles[j].y;
-						const double dzlj = particles[l].z - particles[j].z;
+					if (k != j){
+						const double dxlj = particles[k].x - particles[j].x;
+						const double dylj = particles[k].y - particles[j].y;
+						const double dzlj = particles[k].z - particles[j].z;
 						const double r2lj = dxlj*dxlj + dylj*dylj + dzlj*dzlj;
 						const double rlj = sqrt(r2lj);
-						a2 += (1./(C*C)) * G*particles[l].m/rlj;
+						a2 += (1./(C*C)) * G*particles[k].m/rlj;
 					}
 				}
 
-				double a3;
 				double vi2 = particles[i].vx*particles[i].vx + particles[i].vy*particles[i].vy + particles[i].vz*particles[i].vz;
-				a3 = -vi2/(C*C);
+				double a3 = -vi2/(C*C);
 
-				double a4;
 				double vj2 = particles[j].vx*particles[j].vx + particles[j].vy*particles[j].vy + particles[j].vz*particles[j].vz;
-				a4 = -2.*vj2/(C*C);
+				double a4 = -2.*vj2/(C*C);
 
-				double a5;
-				a5 = (4./(C*C)) * (particles[i].vx*particles[j].vx + particles[i].vy*particles[j].vy + particles[i].vz*particles[j].vz); 
+				double a5 = (4./(C*C)) * (particles[i].vx*particles[j].vx + particles[i].vy*particles[j].vy + particles[i].vz*particles[j].vz); 
 				
-				double a6;
 				double a6_0 = dxij*particles[j].vx + dyij*particles[j].vy + dzij*particles[j].vz;
-				a6 = (3./(2.*C*C)) * a6_0*a6_0/r2ij;
+				double a6 = (3./(2.*C*C)) * a6_0*a6_0/r2ij;
 				
 				double factor1 = -1. + a1 + a2 + a3 + a4 + a5 + a6;
 				 
 				a_constx += G*particles[j].m*dxij*factor1/(r2ij*rij);
 				a_consty += G*particles[j].m*dyij*factor1/(r2ij*rij);
 				a_constz += G*particles[j].m*dzij*factor1/(r2ij*rij);
-			}
-		}	
-		// 2nd consant part
-		for (int j=0; j<_N_real; j++){
-			if (j != i){
-				const double dxij = particles[i].x - particles[j].x;
-				const double dyij = particles[i].y - particles[j].y;
-				const double dzij = particles[i].z - particles[j].z;
-				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
-				const double rij = sqrt(r2ij);
+				
+				
 				const double dvxij = particles[i].vx - particles[j].vx;
 				const double dvyij = particles[i].vy - particles[j].vy;
 				const double dvzij = particles[i].vz - particles[j].vz;
@@ -207,20 +200,19 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				a_constz += G*particles[j].m*factor2*dvzij/(r2ij*rij)/(C*C);
 			}
 		}
-		a_const[i][0] = a_constx;
-		a_const[i][1] = a_consty;
-		a_const[i][2] = a_constz;
+		a_const[i].x = a_constx;
+		a_const[i].y = a_consty;
+		a_const[i].z = a_constz;
 	}
 	//fprintf(stderr,"%.16e\t%.16e\n",particles[1].ax, a_newton[1][0]);
 
 
 	// Now running the substitution again and again through the loop below
 	for (int k=0; k<10; k++){ // you can set k as how many substitution you want to make
-		double a_old[_N_real][3]; // initialize an arry that stores the information of previousu calculated accleration
-		for (int i=0; i<_N_real; i++){
-			a_old[i][0] = a_new[i][0]; // when k = 0, a_new is the Newtownian term which calculated before
-			a_old[i][1] = a_new[i][1];
-			a_old[i][2] = a_new[i][2];
+		{ // Swap
+			struct reb_vec3d* a_tmp = a_old;
+			a_old = a_new;
+			a_new = a_tmp;
 		}
 		// now add on the non-constant term
 		for (int i=0; i<_N_real; i++){ // a_j is used to update a_i and vice versa
@@ -234,29 +226,25 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 					const double dzij = particles[i].z - particles[j].z;
 					const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
 					const double rij = sqrt(r2ij);
-					non_constx += (G*particles[j].m*dxij/(r2ij*rij))*(dxij*a_old[j][0]+dyij*a_old[j][1]+dzij*a_old[j][2])/(2.*C*C)+\
-										(7./(2.*C*C))*G*particles[j].m*a_old[j][0]/rij;
-					non_consty += (G*particles[j].m*dyij/(r2ij*rij))*(dxij*a_old[j][0]+dyij*a_old[j][1]+dzij*a_old[j][2])/(2.*C*C)+\
-										(7./(2.*C*C))*G*particles[j].m*a_old[j][1]/rij;
-					non_constz += (G*particles[j].m*dzij/(r2ij*rij))*(dxij*a_old[j][0]+dyij*a_old[j][1]+dzij*a_old[j][2])/(2.*C*C)+\
-										(7./(2.*C*C))*G*particles[j].m*a_old[j][2]/rij;
+					non_constx += (G*particles[j].m*dxij/(r2ij*rij))*(dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z)/(2.*C*C)+\
+										(7./(2.*C*C))*G*particles[j].m*a_old[j].x/rij;
+					non_consty += (G*particles[j].m*dyij/(r2ij*rij))*(dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z)/(2.*C*C)+\
+										(7./(2.*C*C))*G*particles[j].m*a_old[j].y/rij;
+					non_constz += (G*particles[j].m*dzij/(r2ij*rij))*(dxij*a_old[j].x+dyij*a_old[j].y+dzij*a_old[j].z)/(2.*C*C)+\
+										(7./(2.*C*C))*G*particles[j].m*a_old[j].z/rij;
 				}
 			}
-			a_new[i][0] = (a_const[i][0] + non_constx);
-			a_new[i][1] = (a_const[i][1] + non_consty);
-			a_new[i][2] = (a_const[i][2] + non_constz);
+			a_new[i].x = (a_const[i].x + non_constx);
+			a_new[i].y = (a_const[i].y + non_consty);
+			a_new[i].z = (a_const[i].z + non_constz);
 		}
 
 		// break out loop if a_new is converging
 		int breakout = 0;
 		for (int i=0; i< _N_real; i++){
-			double dx = fabs(a_new[i][0] - a_old[i][0])/a_old[i][0];
-			double dy = fabs(a_new[i][1] - a_old[i][1])/a_old[i][1];
-			double dz = fabs(a_new[i][2] - a_old[i][2])/a_old[i][2];
-			/*if (i ==1){FILE* d = fopen("difference.txt","a"); // this is used to check if the loop is giving resonable output
-			fprintf(d, "number %d: %d: %.30e \n", k, i, dx);
-			fclose(d);
-			}*/
+			double dx = fabs(a_new[i].x - a_old[i].x)/a_old[i].x;
+			double dy = fabs(a_new[i].y - a_old[i].y)/a_old[i].y;
+			double dz = fabs(a_new[i].z - a_old[i].z)/a_old[i].z;
 			if ((dx<1.e-30) && (dy<1.e-30) && (dz<1.e-30)){
 				breakout += 1;
 			}
@@ -268,9 +256,9 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	}
 	// update acceleration in particles
 	for (int i=0; i<_N_real;i++){
-		particles[i].ax += a_new[i][0] - a_newton[i][0]; // substract newtonian term off since WHFAST would add it on later
-		particles[i].ay += a_new[i][1] - a_newton[i][1];
-		particles[i].az += a_new[i][2] - a_newton[i][2];
+		particles[i].ax += a_new[i].x - a_newton[i].x; // substract newtonian term off since WHFAST would add it on later
+		particles[i].ay += a_new[i].y - a_newton[i].y;
+		particles[i].az += a_new[i].z - a_newton[i].z;
 	}
 					
 }

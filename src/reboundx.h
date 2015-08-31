@@ -66,7 +66,12 @@ struct rebx_params_modify_orbits_direct {
 };
 
 struct rebx_params_gr {
+	int allocatedN;
 	double c;
+	struct reb_vec3d* a_newton;
+	struct reb_vec3d* a_new;
+	struct reb_vec3d* a_old;
+	struct reb_vec3d* a_const;
 };
 
 struct rebx_extras {	

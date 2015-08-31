@@ -63,7 +63,12 @@ struct rebx_extras* rebx_init(struct reb_simulation* sim){
 	rebx->modify_orbits_direct.tau_omega = NULL;
 	rebx->modify_orbits_direct.e_damping_p = 0.;
 
+	rebx->gr.allocatedN = 0;
 	rebx->gr.c = C_DEFAULT; // speed of light in default units of AU/(yr/2pi)
+	rebx->gr.a_newton = NULL;
+	rebx->gr.a_new = NULL;
+	rebx->gr.a_old = NULL;
+	rebx->gr.a_const = NULL;
 	return (struct rebx_extras*)sim->extras;
 }
 
@@ -167,6 +172,11 @@ void rebx_free_xparams(struct rebx_extras* const rebx){
 	free(rebx->modify_orbits_direct.tau_e);
 	free(rebx->modify_orbits_direct.tau_inc);
 	free(rebx->modify_orbits_direct.tau_omega);
+	
+	free(rebx->gr.a_newton);
+	free(rebx->gr.a_new);
+	free(rebx->gr.a_old);
+	free(rebx->gr.a_const);
 }
 
 /*Getter/setters*/

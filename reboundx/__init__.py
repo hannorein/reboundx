@@ -11,6 +11,11 @@ except:
     print("Cannot find library 'libreboundx.so'.")
     raise
 
+class reb_vec3d(Structure):
+    _fields_ = [("x", c_double),
+                ("y", c_double),
+                ("z", c_double)]
+
 class rebx_params_modify_orbits_forces(Structure):
     _fields_ = [("allocatedN", c_int),
                 ("tau_a", POINTER(c_double)),
@@ -28,7 +33,12 @@ class rebx_params_modify_orbits_direct(Structure):
                 ("e_damping_p", c_double)]                     
 
 class rebx_params_gr(Structure):
-    _fields_ = [("c", c_double)]
+    _fields_ = [("allocatedN", c_int),
+                ("c", c_double),
+                ("a_newton", POINTER(reb_vec3d)),
+                ("a_new", POINTER(reb_vec3d)),
+                ("a_old", POINTER(reb_vec3d)),
+                ("a_const", POINTER(reb_vec3d))]
 
 class Extras(Structure):
     def __init__(self, sim):
