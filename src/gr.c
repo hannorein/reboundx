@@ -137,31 +137,46 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 
 	// then compute the constant terms:
 	memset(a_const,0,sizeof(struct reb_vec3d)*_N_real);
+	////// 1
 	for (int i=0; i<_N_real; i++){
 		// 1st constant part
+		double a1 = 0.;
+		for (int k=0; k<_N_real; k++){
+			if (k != i){
+				const double dxik = particles[i].x - particles[k].x;
+				const double dyik = particles[i].y - particles[k].y;
+				const double dzik = particles[i].z - particles[k].z;
+				const double r2ik = dxik*dxik + dyik*dyik + dzik*dzik;
+				const double rik = sqrt(r2ik);
+				a1 += G*particles[k].m/rik;
+			}
+		}
 		for (int j=0; j<_N_real; j++){
 			if (j != i){
-				double a1 = 0.;
-				double a2 = 0.;
-				for (int k=0; k<_N_real; k++){
-					if (k != i){
-						const double dxik = particles[i].x - particles[k].x;
-						const double dyik = particles[i].y - particles[k].y;
-						const double dzik = particles[i].z - particles[k].z;
-						const double r2ik = dxik*dxik + dyik*dyik + dzik*dzik;
-						const double rik = sqrt(r2ik);
-						a1 += 4.* G*particles[k].m/rik;
-					}
-					if (k != j){
-						const double dxlj = particles[k].x - particles[j].x;
-						const double dylj = particles[k].y - particles[j].y;
-						const double dzlj = particles[k].z - particles[j].z;
-						const double r2lj = dxlj*dxlj + dylj*dylj + dzlj*dzlj;
-						const double rlj = sqrt(r2lj);
-						a2 += G*particles[k].m/rlj;
-					}
-				}
+				const double dxij = particles[i].x - particles[j].x;
+				const double dyij = particles[i].y - particles[j].y;
+				const double dzij = particles[i].z - particles[j].z;
+				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
+				const double rij = sqrt(r2ij);
+				const double rij3i = 1./(r2ij*rij);
 				
+				const double prefac1 = G*particles[j].m*4.*a1*rij3i*C2i;
+				
+				const double prefac2 = G*particles[i].m*a1*rij3i*C2i;
+				a_const[i].x += prefac1*dxij;
+				a_const[i].y += prefac1*dyij;
+				a_const[i].z += prefac1*dzij;
+				
+				a_const[j].x -= prefac2*dxij;
+				a_const[j].y -= prefac2*dyij;
+				a_const[j].z -= prefac2*dzij;
+			}
+		}
+	}
+	////// 2
+	for (int i=0; i<_N_real; i++){
+		// 1st constant part
+		for (int j=i+1; j<_N_real; j++){
 				const double dxij = particles[i].x - particles[j].x;
 				const double dyij = particles[i].y - particles[j].y;
 				const double dzij = particles[i].z - particles[j].z;
@@ -193,7 +208,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 					       +dzij*particles[j].vz;
 				double a6 = 3./2. * dxijvj*dxijvj/r2ij;
 				
-				double factor1 = a1 + a2 + a3 + a4 + a5 + a6;
+				double factor1 = a3 + a4 + a5 + a6;
 					
 				double factor2 = dxij*(4.*particles[i].vx-3.*particles[j].vx)
 				                +dyij*(4.*particles[i].vy-3.*particles[j].vy)
@@ -204,8 +219,24 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				a_const[i].x += prefac1*dxij + prefac2*dvxij;
 				a_const[i].y += prefac1*dyij + prefac2*dvyij;
 				a_const[i].z += prefac1*dzij + prefac2*dvzij;
+				
+				
+				double dxijvi = dxij*particles[i].vx 
+				               +dyij*particles[i].vy 
+					       +dzij*particles[i].vz;
+				double a6i = 3./2. * dxijvi*dxijvi/r2ij;
+				double factor1j = -vj2 - 2.*vi2 + a5 + a6i;
+				
+				double factor2j= dxij*(4.*particles[j].vx-3.*particles[i].vx)
+				                +dyij*(4.*particles[j].vy-3.*particles[i].vy)
+						+dzij*(4.*particles[j].vz-3.*particles[i].vz);
+				
+				const double prefac1j = G*particles[i].m*factor1j*rij3i*C2i;
+				const double prefac2j =-G*particles[i].m*factor2j*rij3i*C2i;
+				a_const[j].x += -prefac1j*dxij - prefac2j*dvxij;
+				a_const[j].y += -prefac1j*dyij - prefac2j*dvyij;
+				a_const[j].z += -prefac1j*dzij - prefac2j*dvzij;
 			}
-		}
 	}
 
 
