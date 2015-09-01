@@ -98,7 +98,6 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 	const double C = rebxparams->c;
 	const double GC2i = G*1./(C*C);
 	struct reb_particle* const restrict particles = sim->particles;
-	const unsigned int _gravity_ignore_10 = sim->gravity_ignore_10;
 
 	if (rebxparams->allocatedN<_N_real){
 		rebxparams->a_const = realloc(rebxparams->a_const, sizeof(struct reb_vec3d)*_N_real);
@@ -118,7 +117,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		a_newton[i].z = particles[i].az;
 	}
 	// extra newtonian terms
-	if (_gravity_ignore_10 && _N_real>1){
+	if (sim->gravity_ignore_10 && _N_real>1){
 		const double dx = particles[0].x - particles[1].x;
 		const double dy = particles[0].y - particles[1].y;
 		const double dz = particles[0].z - particles[1].z;
@@ -127,12 +126,12 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 		const double prefact = -G/(r2*r);
 		const double prefact0 = prefact*particles[0].m;
 		const double prefact1 = prefact*particles[1].m;
-		a_newton[0].x = prefact1*dx;
-		a_newton[0].y = prefact1*dy;
-		a_newton[0].z = prefact1*dz;
-		a_newton[1].x = prefact0*dx;
-		a_newton[1].y = prefact0*dy;
-		a_newton[1].z = prefact0*dz;
+		a_newton[0].x += prefact1*dx;
+		a_newton[0].y += prefact1*dy;
+		a_newton[0].z += prefact1*dz;
+		a_newton[1].x += prefact0*dx;
+		a_newton[1].y += prefact0*dy;
+		a_newton[1].z += prefact0*dz;
 	}
 
 	// then compute the constant terms:
