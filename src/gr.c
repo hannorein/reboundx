@@ -158,11 +158,10 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double dzij = particles[i].z - particles[j].z;
 				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
 				const double rij = sqrt(r2ij);
-				const double rij3i = 1./(r2ij*rij);
-				
-				const double prefac1 = G*particles[j].m*4.*a1*rij3i*C2i;
-				
-				const double prefac2 = G*particles[i].m*a1*rij3i*C2i;
+				const double prefac = a1*G*C2i/(r2ij*rij);
+				const double prefac1 = particles[j].m*4.*prefac;
+				const double prefac2 = particles[i].m*prefac;
+
 				a_const[i].x += prefac1*dxij;
 				a_const[i].y += prefac1*dyij;
 				a_const[i].z += prefac1*dzij;
@@ -182,57 +181,52 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double dzij = particles[i].z - particles[j].z;
 				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
 				const double rij = sqrt(r2ij);
-				const double rij3i = 1./(r2ij*rij);
+				const double prefac = G*C2i/(r2ij*rij);
 				
 				const double dvxij = particles[i].vx - particles[j].vx;
 				const double dvyij = particles[i].vy - particles[j].vy;
 				const double dvzij = particles[i].vz - particles[j].vz;
 
-				double vi2  = particles[i].vx*particles[i].vx 
-				             +particles[i].vy*particles[i].vy 
-					     +particles[i].vz*particles[i].vz;
-				double a3 = -vi2;
+				const double vi2  = particles[i].vx*particles[i].vx 
+				             	   +particles[i].vy*particles[i].vy 
+					     	   +particles[i].vz*particles[i].vz;
 
-				double vj2  = particles[j].vx*particles[j].vx 
-				             +particles[j].vy*particles[j].vy 
-					     +particles[j].vz*particles[j].vz;
-				double a4 = -2.*vj2;
+				const double vj2  = particles[j].vx*particles[j].vx 
+				             	   +particles[j].vy*particles[j].vy 
+					     	   +particles[j].vz*particles[j].vz;
 
-				double vij2 = particles[i].vx*particles[j].vx 
-				             +particles[i].vy*particles[j].vy 
-					     +particles[i].vz*particles[j].vz; 
-				double a5 = 4.*vij2; 
+				const double vij2 = particles[i].vx*particles[j].vx 
+				             	    +particles[i].vy*particles[j].vy 
+					     	    +particles[i].vz*particles[j].vz; 
 				
-				double dxijvj = dxij*particles[j].vx 
-				               +dyij*particles[j].vy 
-					       +dzij*particles[j].vz;
-				double a6 = 3./2. * dxijvj*dxijvj/r2ij;
+				const double dxijvj = dxij*particles[j].vx 
+				               	     +dyij*particles[j].vy 
+					       	     +dzij*particles[j].vz;
 				
-				double factor1 = a3 + a4 + a5 + a6;
+				const double factor1 = -vi2 - 2.*vj2 + 4.*vij2 + 3./2. * dxijvj*dxijvj/r2ij;
 					
-				double factor2 = dxij*(4.*particles[i].vx-3.*particles[j].vx)
-				                +dyij*(4.*particles[i].vy-3.*particles[j].vy)
-						+dzij*(4.*particles[i].vz-3.*particles[j].vz);
+				const double factor2 = dxij*(4.*particles[i].vx-3.*particles[j].vx)
+				                      +dyij*(4.*particles[i].vy-3.*particles[j].vy)
+						      +dzij*(4.*particles[i].vz-3.*particles[j].vz);
 
-				const double prefac1 = G*particles[j].m*factor1*rij3i*C2i;
-				const double prefac2 = G*particles[j].m*factor2*rij3i*C2i;
-				a_const[i].x += prefac1*dxij + prefac2*dvxij;
-				a_const[i].y += prefac1*dyij + prefac2*dvyij;
-				a_const[i].z += prefac1*dzij + prefac2*dvzij;
+				const double prefac1i = particles[j].m*factor1*prefac;
+				const double prefac2i = particles[j].m*factor2*prefac;
+				a_const[i].x += prefac1i*dxij + prefac2i*dvxij;
+				a_const[i].y += prefac1i*dyij + prefac2i*dvyij;
+				a_const[i].z += prefac1i*dzij + prefac2i*dvzij;
 				
+				const double dxijvi = dxij*particles[i].vx 
+				                     +dyij*particles[i].vy 
+					             +dzij*particles[i].vz;
+
+				const double factor1j = -vj2 - 2.*vi2 + 4.*vij2 + 3./2. * dxijvi*dxijvi/r2ij;
 				
-				double dxijvi = dxij*particles[i].vx 
-				               +dyij*particles[i].vy 
-					       +dzij*particles[i].vz;
-				double a6i = 3./2. * dxijvi*dxijvi/r2ij;
-				double factor1j = -vj2 - 2.*vi2 + a5 + a6i;
+				const double factor2j= dxij*(4.*particles[j].vx-3.*particles[i].vx)
+				                      +dyij*(4.*particles[j].vy-3.*particles[i].vy)
+						      +dzij*(4.*particles[j].vz-3.*particles[i].vz);
 				
-				double factor2j= dxij*(4.*particles[j].vx-3.*particles[i].vx)
-				                +dyij*(4.*particles[j].vy-3.*particles[i].vy)
-						+dzij*(4.*particles[j].vz-3.*particles[i].vz);
-				
-				const double prefac1j = G*particles[i].m*factor1j*rij3i*C2i;
-				const double prefac2j =-G*particles[i].m*factor2j*rij3i*C2i;
+				const double prefac1j = particles[i].m*factor1j*prefac;
+				const double prefac2j =-particles[i].m*factor2j*prefac;
 				a_const[j].x += -prefac1j*dxij - prefac2j*dvxij;
 				a_const[j].y += -prefac1j*dyij - prefac2j*dvyij;
 				a_const[j].z += -prefac1j*dzij - prefac2j*dvzij;
