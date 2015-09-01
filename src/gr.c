@@ -261,7 +261,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double rij = sqrt(r2ij);
 				const double daj = dxij*a_oldjx+dyij*a_oldjy+dzij*a_oldjz;
 				const double dai = dxij*a_oldix+dyij*a_oldiy+dzij*a_oldiz;
-				const double prefac1 = G/(r2ij*rij*2.*C*C);
+				const double prefac1 = 1./2.*GC2i/(r2ij*rij);
 				const double prefac2 = 7./2.*GC2i/rij;
 				a_new[i].x += particles[j].m * (prefac1*daj*dxij + prefac2*a_oldjx);
 				a_new[i].y += particles[j].m * (prefac1*daj*dyij + prefac2*a_oldjy);
