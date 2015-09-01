@@ -93,10 +93,10 @@ void rebx_gr_potential(struct reb_simulation* const sim){
 
 void rebx_gr_implicit(struct reb_simulation* const sim){
 	struct rebx_params_gr* rebxparams = &((struct rebx_extras*)(sim->extras))->gr;
-	const double C = rebxparams->c;
-	const double C2i = 1./(C*C);
 	const int _N_real = sim->N - sim->N_var;
 	const double G = sim->G;
+	const double C = rebxparams->c;
+	const double GC2i = G*1./(C*C);
 	struct reb_particle* const restrict particles = sim->particles;
 	const unsigned int _gravity_ignore_10 = sim->gravity_ignore_10;
 
@@ -158,7 +158,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double dzij = particles[i].z - particles[j].z;
 				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
 				const double rij = sqrt(r2ij);
-				const double prefac = a1*G*C2i/(r2ij*rij);
+				const double prefac = a1*GC2i/(r2ij*rij);
 				const double prefac1 = particles[j].m*4.*prefac;
 				const double prefac2 = particles[i].m*prefac;
 
@@ -181,7 +181,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double dzij = particles[i].z - particles[j].z;
 				const double r2ij = dxij*dxij + dyij*dyij + dzij*dzij;
 				const double rij = sqrt(r2ij);
-				const double prefac = G*C2i/(r2ij*rij);
+				const double prefac = GC2i/(r2ij*rij);
 				
 				const double dvxij = particles[i].vx - particles[j].vx;
 				const double dvyij = particles[i].vy - particles[j].vy;
@@ -263,7 +263,7 @@ void rebx_gr_implicit(struct reb_simulation* const sim){
 				const double daj = dxij*a_oldjx+dyij*a_oldjy+dzij*a_oldjz;
 				const double dai = dxij*a_oldix+dyij*a_oldiy+dzij*a_oldiz;
 				const double prefac1 = G/(r2ij*rij*2.*C*C);
-				const double prefac2 = (7./2.*C2i)*G/rij;
+				const double prefac2 = 7./2.*GC2i/rij;
 				a_new[i].x += particles[j].m * (prefac1*daj*dxij + prefac2*a_oldjx);
 				a_new[i].y += particles[j].m * (prefac1*daj*dyij + prefac2*a_oldjy);
 				a_new[i].z += particles[j].m * (prefac1*daj*dzij + prefac2*a_oldjz);
