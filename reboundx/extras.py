@@ -199,8 +199,7 @@ class Extras(Structure):
         def monkeyset(self, name, value):
             if (name not in rebound.Particle.__dict__) and (not hasattr(super(rebound.Particle, self), name)):
                 # create new param in c
-                print name
-                clibreboundx.rebx_set_param_double(byref(self), c_char_p(name), c_double(value))
+                clibreboundx.rebx_set_param_double(byref(self), c_char_p(name.encode('utf-8')), c_double(value))
             else:
                 rebound.Particle.default_set(self, name, value)
                 
@@ -208,7 +207,7 @@ class Extras(Structure):
             if (name not in rebound.Particle.__dict__) and (not hasattr(super(rebound.Particle, self), name)):
                 # check param in c
                 clibreboundx.rebx_get_param_double.restype = c_double
-                return clibreboundx.rebx_get_param_double(byref(self), c_char_p(name))
+                return clibreboundx.rebx_get_param_double(byref(self), c_char_p(name.encode('utf-8')))
             else:
                 return super(rebound.Particle, self).__getattr__(name)
 
